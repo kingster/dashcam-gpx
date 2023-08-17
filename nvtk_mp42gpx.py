@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Author: Sergei Franco (sergei at sergei.nz)
 # License: GPL3
 # Warranty: NONE! Use at your own risk!
@@ -11,7 +11,8 @@ import glob
 import struct
 import math
 import time
-
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 def check_out_file(out_file, force):
     """ checks if the out_file exists and bomb-out if 'force' flag is not set """
@@ -111,16 +112,21 @@ def get_args():
     return in_file, out_file, force, multiple, deobfuscate, sort_by, del_outliers
 
 
-def fix_time(datetime):
+def fix_time(datetime_param):
     """ time format manipulation -> YYYY-MM-DDTHH:mm:SSZ """
     date = ("%d-%02d-%02dT%02d:%02d:%02dZ"
-            % ((datetime['Year'] + 2000),
-               int(datetime['Month']),
-               int(datetime['Day']),
-               int(datetime['Hour']),
-               int(datetime['Minute']),
-               int(datetime['Second'])))
+            % ((datetime_param['Year'] + 2000),
+               int(datetime_param['Month']),
+               int(datetime_param['Day']),
+               int(datetime_param['Hour']),
+               int(datetime_param['Minute']),
+               int(datetime_param['Second'])))
     return date
+
+def local_time(iso_date):
+    dt = datetime.fromisoformat(iso_date.replace('Z', '+00:00'))
+    local_date = dt.astimezone(ZoneInfo('Asia/Kolkata'))
+    return local_date.isoformat()
 
 
 def fix_coordinates(hemisphere, coordinate, deobfuscate=False):
@@ -135,8 +141,8 @@ def fix_coordinates(hemisphere, coordinate, deobfuscate=False):
 
 
 def fix_speed(speed):
-    """ simple knot to m/s conversion; 1 knot = 0.514444 m/s """
-    return speed * float(0.514444)
+    """ simple knot to km/s conversion; 1 knot = 1.852 km/s """
+    return speed * float(1.852)
 
 
 def get_atom_info(eight_bytes):
@@ -322,6 +328,7 @@ def get_gps_data(data, deobfuscate):
             gps['Loc']['Lon']['Hemi'], gps['Loc']['Lon']['Raw'], deobfuscate)
         gps['Loc']['Speed'] = fix_speed(gps['Loc']['Speed'])
         gps['DT']['DT'] = fix_time(gps['DT'])
+        gps['DT']['Local'] = local_time(gps['DT']['DT'])
     else:
         return None
     try:
@@ -379,7 +386,7 @@ def generate_gpx(gps_data, out_file):
             gpx += ("\t\t<trkpt lat=\"%f\" lon=\"%f\"><time>%s</time>"
                     % (gps['Loc']['Lat']['Float'],
                        gps['Loc']['Lon']['Float'],
-                       gps['DT']['DT']))
+                       gps['DT']['Local']))
 
             gpx += ("<speed>%f</speed><course>%f</course></trkpt>\n"
                     % (gps['Loc']['Speed'],
